@@ -118,7 +118,12 @@ router.get("/products_by_id", auth, (req, res) => {
   let productIds = req.query.id
   
   if(type === "array"){
-  
+    //아이디가 여러개면 ,이걸로 나눠서 구분해
+    let ids = req.query.id.split(',');
+    productIds = [];
+    productIds = ids.map(item => {
+      return item
+    })
   }
   
   //wee need to find the product information that belong to product Id
@@ -128,8 +133,6 @@ router.get("/products_by_id", auth, (req, res) => {
     if(err) return req.status(400).send(err)
     return res.status(200).send(product)
   })
-  
-
 });
 
 

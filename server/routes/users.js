@@ -7,7 +7,7 @@ const { auth } = require("../middleware/auth");
 //=================================
 //             User
 //=================================
-
+//이것을 무조건 거쳐가
 router.get("/auth", auth, (req, res) => {
     res.status(200).json({
         _id: req.user._id,
@@ -18,6 +18,8 @@ router.get("/auth", auth, (req, res) => {
         lastname: req.user.lastname,
         role: req.user.role,
         image: req.user.image,
+        cart: req.user.cart,
+        history: req.user.history
     });
 });
 
@@ -67,5 +69,50 @@ router.get("/logout", auth, (req, res) => {
         });
     });
 });
+
+router.get("/addToCart", auth, (req,res) => {
+  
+  Usershop.findOne({_id: req.user._id}, (err,userInfo)=>{
+      let duplicate = false;
+    
+    userInfo.cart.forEach((item) => {
+      if (item.id == req.query.productId) {
+        duplicate = true;
+      }
+    })
+      
+       if(duplicate){
+         Usershop.findOneAndUpdate(
+           {_id:req.user._id, "card.id": req.query.productId},
+           {$inc: {"cart.$.quantity": 1}},
+           {new:true},
+           (err,userInfo) => {
+             if(err) return res.json({success:false, err})
+             res.status(200).json(userInfo.cart)
+           }
+         )
+       } else{
+        Usershop.findOneAndUpdate(
+          {_id: req.user._id},
+          {
+            $push:{
+              cart: {
+                id:req.query.productId,
+                quantity:1,
+                data: Date.now()
+              }
+            }
+          },
+          
+          {new: true},
+          (err,userInfo) => {
+            if(err) return res.json({success: false, err});
+            res.status(200).json(userInfo.cart)
+          }
+          
+        )
+       }
+    })
+})
 
 module.exports = router;
