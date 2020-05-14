@@ -1,9 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const { Usershop } = require("../models/User");
-
+const {Product} = require("../models/Product")
 const { auth } = require("../middleware/auth");
-
+const {Payment} = require("../models/Payment");
+const async = require('async')
 //=================================
 //             User
 //=================================
@@ -114,5 +115,145 @@ router.get("/addToCart", auth, (req,res) => {
        }
     })
 })
+
+router.get('/removeFromCart', auth,(req,res) => {
+
+  Usershop.findOneAndUpdate(
+    {_id: req.user._id},
+    {
+      "$pull":
+        {"cart": {"id": req.query._id}}
+    },
+    {new:true},
+    (err,userInfo) => {
+    let cart = userInfo.cart;
+    //cart의 id가 array에 들어가있어
+    let array = cart.map(item => {
+      return item.id
+    })
+      
+      Product.find({'_id': {$in:array}})
+      .populate('writer')
+      .exec((err,cartDetail) => {
+        return res.status(200).json({
+          cartDetail,
+          cart
+        })
+      })
+  }
+  
+  )
+})
+
+router.get('/userCartInfo',auth,(req,res) =>{
+  Usershop.findOne(
+    {_id: req.user._id},
+    (err,userInfo) => {
+      let cart = userInfo.cart;
+      let array = cart.map(item => {
+        return item.id
+      })
+      
+      Product.find({'_id' : {$in: array}})
+      .populate('writer')
+      .exec((err,cartDetail) => {
+        if(err) return res.status(400).send(err);
+        return res.status(200).json({success:true, cartDetail,cart})
+      })
+    }
+  )
+} )
+
+router.post('/successBuy', auth,(req,res) => {
+  let history = [];
+  let transactionData = {};
+  
+  //1put brief payment information inside User collection
+  req.body.cartDetail.forEach((item) => {
+    history.push({
+      dateOfPurchase: Date.now(),
+      name: item.title,
+      id: item._id,
+      price: item.price,
+      quantity: item.quantity,
+      paymentId: req.body.paymentData.paymentID
+    })
+  })
+  
+  
+  //2put payment information that come from paypal into payment collection
+  transactionData.user = {
+    id:req.user._id,
+    name:req.user.name,
+    lastname:req.user.lastname,
+    email:req.user.email,
+    
+  }
+  
+  transactionData.data =req.body.paymentData;
+  
+  transactionData.product = history
+  
+  Usershop.findOneAndUpdate(
+    {_id: req.user._id},
+    {$push:{history:history}, $set: {cart: [] }},
+  {new: true},
+  (err,user) => {
+      if(err) return res.json({success: false,err})
+    
+  const payment = new Payment(transactionData)
+    payment.save((err,doc) => {
+      if(err) return res.json({success: false,err})
+  
+      //3 increase the amout of number for the sold information
+      //first we need to know how many product were sold in this transaction for
+      //each of products
+      
+      let products = [];
+      doc.product.forEach(item => {
+        products.push({id: item.id, quantity:item.quantity })
+      })
+      
+      async.eachSeries(products,(item,callback) => {
+        Product.update(
+          {_id: item.id},
+          {
+            $inc: {
+              "sold": item.quantity
+            }
+          },
+          {new:false},
+          callback
+        )
+      },(err) => {
+        if(err) return res.json({success:false, err})
+        res.status(200).json({
+          success: true,
+          cart: user.cart,
+          cartDetail: []
+        })
+      })
+  
+  
+    })
+  }
+    )
+  
+  
+  
+})
+
+
+router.get('/getHistory',auth,(req,res) => {
+  Usershop.findOne(
+    {_id: req.user._id},
+    (err,doc) => {
+      let history = doc.history;
+      if(err) return res.status(400).send(err)
+      return res.status(200).json({success: true,history})
+    }
+  )
+})
+
 
 module.exports = router;

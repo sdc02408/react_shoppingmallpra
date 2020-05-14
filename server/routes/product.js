@@ -103,13 +103,6 @@ router.post("/getProducts", (req, res) => {
       res.status(200).json({success:true, products, postSize: products.length})
     })
   }
-  
-  
-  
-  
-  
-  
-  
 });
   
   // ?id=${productId}&type=single

@@ -1,14 +1,17 @@
 import React, { useEffect, useState } from 'react'
 import {useDispatch} from 'react-redux'
-import {getCartItems } from '../../../_actions/user_actions'
+import {getCartItems,removeCartItem,onSuccessBuy } from '../../../_actions/user_actions'
 import UserCardBlock from './Sections/UserCardBlock'
 import {Result,Empty} from 'antd';
-
+import Axios from 'axios'
+import Paypal from '../utils/Paypal'
 
 function CartPage (props) {
   const dispatch = useDispatch();
   
   const [Total,setTotal] = useState(0)
+  const [ShowTotal,setShowTotal] = useState(false)
+  const [ShowSuccess,setShowSuccess] = useState(false)
   
   useEffect(() => {
     
@@ -41,7 +44,64 @@ function CartPage (props) {
     })
    
    setTotal(total)
+    setShowTotal(true)
   }
+  
+  const removeFromCart = (productId) => {
+    dispatch(removeCartItem(productId))
+    .then(() => {
+      
+      Axios.get(`/api/users/userCartInfo`)
+      .then(response => {
+        if(response.data.success){
+          if(response.data.cartDetail.length <= 0){
+            setShowTotal(false)
+          } else{
+            calculateTotal(response.data.cartDetail)
+          }
+        } else{
+          alert('failed to get cart info')
+        }
+        
+      })
+      
+      // if(props.user.cartDetail.length <= 0){
+      //   setShowTotal(false)
+      // } else {
+      //   calculateTotal(props.user.cartDetail)
+      // }
+      
+    })
+    
+  }
+  const transactionSuccess = (data) => {
+  
+    let variables = {
+      cartDetail: props.user.cartDetail,
+      paymentData: data
+    }
+    
+    Axios.post('/api/users/successBuy', variables)
+    .then(response => {
+      if(response.data.success) {
+        setShowSuccess(true)
+        setShowTotal(false)
+        
+        dispatch(onSuccessBuy({cart: response.data.cart, cartDetail:response.data.cartDetail}))
+      } else{
+        alert('failed to buy it')
+      }
+    })
+  }
+  
+  const transactionError = () => {
+    console.log('paypal')
+  }
+  
+  const transactionCanceled = () => {
+    console.log('cancel')
+  }
+  
   
   return(
     <div>
@@ -51,29 +111,52 @@ function CartPage (props) {
         
           <UserCardBlock
               products={props.user.cartDetail}
+              removeItem={removeFromCart}
           >
           
           </UserCardBlock>
         
-          <div style={{marginTop:'3rem'}}>
-            <h2> Total amount: ${Total}</h2>
-          </div>
+        
           
+          
+          
+          {ShowTotal ?
+            <div style={{marginTop:'3rem'}}>
+              <h2> Total amount: ${Total}</h2>
+            </div>
+            :
+            
+            ShowSuccess ?
+            
           <Result
             status="success"
             title="Successfully purchased Items"
-          >
-            
+          />
+          
+          :
+  
             <div style={{width:'100%', display:'flex', flexDirection:'column', justifyContent:'center'}}>
               <br/>
               <Empty description={false}/>
               <p>no items in the cart</p>
             </div>
+          }
           
-          </Result>
         </div>
       </div>
       
+      
+      {ShowTotal &&
+
+      <Paypal
+        toPay={Total}
+        onSuccess={transactionSuccess}
+        transactionError={transactionError}
+        transactionCanceled={transactionCanceled}
+      />
+      }
+      
+
       
     </div>
   )

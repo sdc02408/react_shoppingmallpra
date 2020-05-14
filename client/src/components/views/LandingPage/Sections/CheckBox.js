@@ -2,14 +2,12 @@ import React, { useState } from 'react'
 import {Checkbox,Collapse} from 'antd'
 const {Panel} =Collapse
 
-
-
 function CheckBox (props) {
   
   const [Checked, setChecked] =useState([])
   
   const handleToggle = (value) => {
-    //indexOf 문자열에서 원하는 문자열이 있는지 없으면 -1, 있으면 문자열의 시작위치에 해당하는 index
+    //indexOf 문자열에서 원하는 문자열이 있는지, 없으면 -1, 있으면 문자열의 시작위치에 해당하는 index
    //splice()는 배열에서 특정 범위의 값들을 추출하고, 그 자리에 새로운 값을 넣는다.
     const currentIndex = Checked.indexOf(value);
     const newChecked = [...Checked];
@@ -39,7 +37,6 @@ function CheckBox (props) {
   
   return (
     <div>
-    
       <Collapse defaultActiveKey={['0']}>
         <Panel header="Continents" key="1">
           {renderCheckboxLists()}
